@@ -14,7 +14,8 @@ RUN patch -p1 < patch-re2.txt
 RUN cd abseil-cpp && patch -p1 < ../patch-absl.txt
 
 ENV CMAKE_TOOLCHAIN_FILE="/opt/wasi-sdk/share/cmake/wasi-sdk-pthread.cmake"
-ENV CFLAGS="-O3 -pthread --target=wasm32-wasip1-threads --sysroot=/opt/wasi-sdk/share/wasi-sysroot -DABSL_FORCE_THREAD_IDENTITY_MODE=1 -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_SIGNAL -DABSL_HAVE_MMAP"
+# OPTIMIZED: Swapped -O3 for -Oz (size) and added -flto (Link Time Optimization)
+ENV CFLAGS="-Oz -flto -pthread --target=wasm32-wasip1-threads --sysroot=/opt/wasi-sdk/share/wasi-sysroot -DABSL_FORCE_THREAD_IDENTITY_MODE=1 -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_SIGNAL -DABSL_HAVE_MMAP"
 ENV CXXFLAGS="-fno-exceptions $CFLAGS"
 
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="$CFLAGS" -DCMAKE_CXX_FLAGS="$CXXFLAGS" -DRE2_INSTALL=OFF -S . -B build
@@ -28,7 +29,8 @@ RUN $CXX -c cre2.cpp -o cre2.o -I. -I/re2 -I/re2/abseil-cpp $CXXFLAGS \
   && $AR cru libcre2.a cre2.o \
   && $RANLIB libcre2.a
 
-ENV LDFLAGS="-O3 --target=wasm32-wasip1-threads --sysroot=/opt/wasi-sdk/share/wasi-sysroot -mexec-model=reactor -pthread -lwasi-emulated-process-clocks -lwasi-emulated-mman -lwasi-emulated-signal -Wl,--max-memory=4294967296 -Wl,--global-base=1024"
+# OPTIMIZED: Swapped -O3 for -Oz, added -flto, and added -Wl,--strip-all
+ENV LDFLAGS="-Oz -flto -Wl,--strip-all --target=wasm32-wasip1-threads --sysroot=/opt/wasi-sdk/share/wasi-sysroot -mexec-model=reactor -pthread -lwasi-emulated-process-clocks -lwasi-emulated-mman -lwasi-emulated-signal -Wl,--max-memory=4294967296 -Wl,--global-base=1024"
 
 # Separate step so exports can be updated without recompiling.
 # Number of layers isn't really a concern for this image.
@@ -66,6 +68,7 @@ RUN $CXX -o libcre2-noopt.so -Wl,--global-base=1024 $LDFLAGS \
   -Wl,--export=__stack_pointer \
   -Wl,--export=__tls_base
 
-RUN wasm-opt -o libcre2.wasm --low-memory-unused --flatten --rereloop --converge -O3 libcre2-noopt.so
+# OPTIMIZED: Swapped -O3 for -Oz to optimize for size via Binaryen
+RUN wasm-opt -o libcre2.wasm --low-memory-unused --flatten --rereloop --converge -Oz libcre2-noopt.so
 
 CMD ["cp", "libcre2.wasm", "/out/"]
