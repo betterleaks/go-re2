@@ -3,6 +3,8 @@
 package internal
 
 import (
+	"bytes"
+	"compress/gzip"
 	"container/list"
 	"context"
 	_ "embed"
@@ -27,8 +29,8 @@ import (
 
 var errFailedRead = errors.New("failed to read from wasm memory")
 
-//go:embed wasm/libcre2.wasm
-var libre2 []byte
+//go:embed wasm/libcre2.wasm.gz
+var libre2Gz []byte
 
 // memoryWasm created by `wat2wasm --enable-threads internal/wasm/memory.wat -o internal/wasm/memory.wasm`
 //
@@ -193,6 +195,15 @@ func initWASM(ctx context.Context) {
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 
 	if _, err := rt.InstantiateWithConfig(ctx, memoryWasm, wazero.NewModuleConfig().WithName("env")); err != nil {
+		panic(err)
+	}
+
+	gz, err := gzip.NewReader(bytes.NewReader(libre2Gz))
+	if err != nil {
+		panic(err)
+	}
+	libre2, err := io.ReadAll(gz)
+	if err != nil {
 		panic(err)
 	}
 

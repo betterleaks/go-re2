@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -133,6 +134,30 @@ func buildWasm(a *goyek.A) {
 		a.Fatal(err)
 	}
 	cmd.Exec(a, fmt.Sprintf("docker run --rm -v %s:/out wasilibs-build", wasmDir))
+
+	// Gzip-compress the WASM binary so Go embeds a smaller payload.
+	wasmPath := filepath.Join(wasmDir, "libcre2.wasm")
+	raw, err := os.ReadFile(wasmPath)
+	if err != nil {
+		a.Fatal(err)
+	}
+	var buf bytes.Buffer
+	w, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		a.Fatal(err)
+	}
+	if _, err := w.Write(raw); err != nil {
+		a.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		a.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wasmDir, "libcre2.wasm.gz"), buf.Bytes(), 0o600); err != nil {
+		a.Fatal(err)
+	}
+	if err := os.Remove(wasmPath); err != nil {
+		a.Fatal(err)
+	}
 }
 
 type benchMode int
