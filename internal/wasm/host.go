@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wasilibs/go-re2/internal/wasm/memory"
+	"github.com/betterleaks/go-re2/internal/wasm/memory"
 )
 
 const (

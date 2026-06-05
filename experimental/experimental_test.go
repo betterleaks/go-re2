@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wasilibs/go-re2"
+	"github.com/betterleaks/go-re2"
 )
 
 func TestCompileLatin1(t *testing.T) {

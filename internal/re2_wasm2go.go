@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	wasm2go "github.com/wasilibs/go-re2/internal/wasm"
+	wasm2go "github.com/betterleaks/go-re2/internal/wasm"
 )
 
 var (

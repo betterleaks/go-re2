@@ -5,7 +5,7 @@ package internal
 import (
 	"unsafe"
 
-	"github.com/wasilibs/go-re2/internal/cre2"
+	"github.com/betterleaks/go-re2/internal/cre2"
 )
 
 type wasmPtr unsafe.Pointer
