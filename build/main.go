@@ -11,7 +11,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/curioswitch/go-build"
 	"github.com/google/go-github/github"
-	"github.com/goyek/goyek/v2"
+	"github.com/goyek/goyek/v3"
 	"github.com/goyek/x/boot"
 	"github.com/goyek/x/cmd"
 )
@@ -28,11 +28,11 @@ func main() {
 			if os.Getenv("TEST_NORACE") != "" {
 				race = ""
 			}
-			cmd.Exec(a, fmt.Sprintf(`go test -v -timeout=20m %s -tags "%s" ./...`, race, strings.Join(tags, ",")))
+			cmd.Exec(a, fmt.Sprintf(`go test -v -timeout=40m %s -tags "%s" ./...`, race, strings.Join(tags, ",")))
 			if mode == "" {
 				cmd.Exec(a, fmt.Sprintf("go build -o %s ./internal/e2e", filepath.Join("out", "test.wasm")), cmd.Env("GOOS", "wasip1"), cmd.Env("GOARCH", "wasm"))
 				// Could invoke wazero directly but the CLI has a simpler entry point.
-				cmd.Exec(a, "go run github.com/tetratelabs/wazero/cmd/wazero@v1.8.2 run "+filepath.Join("out", "test.wasm"))
+				cmd.Exec(a, fmt.Sprintf("go run github.com/tetratelabs/wazero/cmd/wazero@%s run %s", verWazero, filepath.Join("out", "test.wasm")))
 			}
 		},
 	}))
@@ -96,7 +96,6 @@ func main() {
 	})
 
 	defineBenchTasks("bench", "./...")
-	defineBenchTasks("wafbench", "./wafbench")
 
 	build.DefineTasks(
 		build.Tags(tags...),
@@ -111,8 +110,11 @@ func buildTags() []string {
 	exhaustive := os.Getenv("RE2_TEST_EXHAUSTIVE") == "1"
 
 	var tags []string
-	if mode == "cgo" {
+	switch mode {
+	case "cgo":
 		tags = append(tags, "re2_cgo")
+	case "wasm2go":
+		tags = append(tags, "re2_wasm2go")
 	}
 	if exhaustive {
 		tags = append(tags, "re2_test_exhaustive")
@@ -164,6 +166,7 @@ type benchMode int
 
 const (
 	benchModeWazero benchMode = iota
+	benchModeWasm2go
 	benchModeCGO
 	benchModeSTDLib
 )
@@ -176,6 +179,8 @@ func benchArgs(pkg string, count int, mode benchMode) string {
 	switch mode {
 	case benchModeCGO:
 		args = append(args, "-tags=re2_cgo")
+	case benchModeWasm2go:
+		args = append(args, "-tags=re2_wasm2go")
 	case benchModeSTDLib:
 		args = append(args, "-tags=re2_bench_stdlib")
 	case benchModeWazero:
@@ -226,6 +231,12 @@ func defineBenchTasks(name string, pkg string) {
 			}
 
 			stdout.Reset()
+			cmd.Exec(a, "go "+benchArgs(pkg, 5, benchModeWasm2go), cmd.Stdout(&stdout))
+			if err := os.WriteFile(filepath.Join("out", name+"-wasm2go.txt"), stdout.Bytes(), 0o600); err != nil {
+				a.Errorf("write bench-wasm2go.txt: %v", err)
+			}
+
+			stdout.Reset()
 			cmd.Exec(a, "go "+benchArgs(pkg, 5, benchModeCGO), cmd.Stdout(&stdout))
 			if err := os.WriteFile(filepath.Join("out", name+"-cgo.txt"), stdout.Bytes(), 0o600); err != nil {
 				a.Errorf("write bench-cgo.txt: %v", err)
@@ -237,8 +248,8 @@ func defineBenchTasks(name string, pkg string) {
 				a.Errorf("write bench-stdlib.txt: %v", err)
 			}
 
-			cmd.Exec(a, fmt.Sprintf("go run golang.org/x/perf/cmd/benchstat@%s %s %s %s", verBenchstat,
-				filepath.Join("out", name+"-stdlib.txt"), filepath.Join("out", name+".txt"), filepath.Join("out", name+"-cgo.txt")))
+			cmd.Exec(a, fmt.Sprintf("go run golang.org/x/perf/cmd/benchstat@%s %s %s %s %s", verBenchstat,
+				filepath.Join("out", name+"-stdlib.txt"), filepath.Join("out", name+"-wasm2go.txt"), filepath.Join("out", name+".txt"), filepath.Join("out", name+"-cgo.txt")))
 		},
 	})
 }
