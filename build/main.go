@@ -139,6 +139,7 @@ func buildWasm(a *goyek.A) {
 
 	// Gzip-compress the WASM binary so Go embeds a smaller payload.
 	wasmPath := filepath.Join(wasmDir, "libcre2.wasm")
+	//nolint:gosec // wasmPath is constructed from the repository root and fixed file names.
 	raw, err := os.ReadFile(wasmPath)
 	if err != nil {
 		a.Fatal(err)
